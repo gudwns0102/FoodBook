@@ -76,7 +76,7 @@ class FBHeader extends React.Component {
     )
 
     return(
-      <View style={{width:'100%', flex: 1, flexDirection:'row', backgroundColor:'white'}}> 
+      <View style={{width:'100%', flex: 1, flexDirection:'row', backgroundColor:'white', borderBottomWidth: 0.5, borderColor:'rgba(201, 201, 201, 0.849)'}}> 
         <TouchableOpacity style={styles.menuView} onPress={()=>navigation.navigate('DrawerToggle')}>
           <Icon name='md-menu' size={25} />
         </TouchableOpacity>

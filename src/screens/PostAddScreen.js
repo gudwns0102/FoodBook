@@ -123,7 +123,6 @@ class PostAddScreen extends React.Component {
       const preview = new Parse.File('preview.jpg', {base64: this.state.previewBase64}, "image/jpg")
       const user = await Parse.User.currentAsync();
 
-
       preview.save();
       photo.save()
       .then(() => {
@@ -135,11 +134,12 @@ class PostAddScreen extends React.Component {
         post.set("description", description);
         post.set("place", place);
 
+        navigation.navigate('GalleryScreen');
+
         post.save(null, {
           success: postObject => {
             console.log("Almost done: ", postObject);
             insertPostObject(postObject);      
-            navigation.navigate('GalleryScreen');
             postUploadEnd();
             alert("Your post is uploaded successfully!")
           },

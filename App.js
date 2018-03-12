@@ -60,6 +60,7 @@ export default class App extends Component {
         HomeScreen: {screen: () => <Screens.HomeScreen parseLogout={this.parseLogout}/>},
         GalleryScreen: {screen: () => <Screens.GalleryScreen />},
         PostAddScreen: {screen: () => <Screens.PostAddScreen />},
+        SettingScreen: {screen: () => <Screens.SettingScreen parseLogout={this.parseLogout}/>},
         TestScreen: {screen: () => <Screens.TestScreen />}
       },
       {
@@ -81,7 +82,6 @@ export default class App extends Component {
         })
       }
     )
-
   }
 
   fetchUser = async () => {

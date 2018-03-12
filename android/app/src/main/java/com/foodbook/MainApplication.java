@@ -3,6 +3,7 @@ package com.foodbook;
 import android.app.Application;
 
 import com.facebook.react.ReactApplication;
+import com.artirigo.fileprovider.RNFileProviderPackage;
 import com.arttitude360.reactnative.rngoogleplaces.RNGooglePlacesPackage;
 import com.facebook.reactnative.androidsdk.FBSDKPackage;
 import com.facebook.react.ReactNativeHost;
@@ -13,14 +14,10 @@ import com.facebook.soloader.SoLoader;
 import java.util.Arrays;
 import java.util.List;
 
-import com.facebook.FacebookSdk;
 import com.facebook.CallbackManager;
-import com.facebook.appevents.AppEventsLogger;
 
 import com.rnfs.RNFSPackage;
-
 import com.imagepicker.ImagePickerPackage;
-
 import com.reactnative.photoview.PhotoViewPackage;
 
 public class MainApplication extends Application implements ReactApplication {
@@ -41,6 +38,7 @@ public class MainApplication extends Application implements ReactApplication {
     protected List<ReactPackage> getPackages() {
       return Arrays.<ReactPackage>asList(
           new MainReactPackage(),
+          new RNFileProviderPackage(),
           new RNGooglePlacesPackage(),
           new FBSDKPackage(mCallbackManager),
           new RNFSPackage(),

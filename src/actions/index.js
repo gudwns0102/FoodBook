@@ -27,9 +27,18 @@ function insertPostObject(postObject){
   }
 }
 
+function deletePostObject(postObject){
+  console.log('deletePostObject')
+  return {
+    type: actionTypes.DELETE_POST_OBJECT,
+    postObject,
+  }
+}
+
 export {
   postUploadStart,
   postUploadEnd,
   fetchPostList,
   insertPostObject,
+  deletePostObject,
 }

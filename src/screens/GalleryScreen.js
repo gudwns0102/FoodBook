@@ -13,22 +13,19 @@ import {
 } from 'react-native';
 
 import { withNavigation } from 'react-navigation';
-
 import Ionicons from 'react-native-vector-icons/Ionicons';
-
+import FontAwesome from 'react-native-vector-icons/FontAwesome';
 import { FBText } from '../components';
-
 import { ShareDialog } from 'react-native-fbsdk';
-
 import RNFS from 'react-native-fs';
-
-import ImagePicker from 'react-native-image-picker';
+import Parse from 'parse/react-native';
 
 /* Redux related modules */
 import * as actions from '../actions';
 import { connect } from 'react-redux';
 import PhotoView from 'react-native-photo-view';
 
+const { width, height } = Dimensions.get('window');
 
 class GalleryScreen extends React.Component {
 
@@ -36,15 +33,17 @@ class GalleryScreen extends React.Component {
     super(props);
 
     this.state = {
+      postList: this.props.postList,
       slideVisible: false,
       targetPost: null,
       index: 0,
+      mode: 'photo'
     }
+
+    this.viewabilityConfig = {viewAreaCoveragePercentThreshold: 100}
   }
 
   toggleSlide = () => this.setState({slideVisible: !this.state.slideVisible});
-
-  scrollToIndex = (index) => this._gallery.scrollToIndex(index);
 
   handleBackButton = () => {
     const { slideVisible } = this.state;
@@ -57,13 +56,9 @@ class GalleryScreen extends React.Component {
     return false;
   }
   /* Facebook sdk doesn't take imageUrl as remote url... 
-     and android sharing requests image uri which is accessible, (= not local uri)
-     so I should download remote image in Camera roll.
-     but I can't find direct way to do it, so it takes some waste in performance...
     1. Download image from remote url to local directory using RNFS
-    2. Move local image to Camera roll.
-    3. Share the image in Camera roll.
-    4. Delete local & camera roll images. 
+    2. Share the image through provider of react-native-image-picker.
+    3. Delete local & camera roll images. 
   */
 
   handleShare = async () => {
@@ -72,7 +67,7 @@ class GalleryScreen extends React.Component {
     const { index } = this.state;
 
     // 1. Download image from remote url.
-    const localuri = RNFS.CachesDirectoryPath + '/' + postList[index].get("photo").name();
+    const localuri = RNFS.ExternalStorageDirectoryPath + '/' + postList[index].get("photo").name();
     const options = {
       fromUrl: postList[index].get("photo").url(),
       toFile: localuri,
@@ -82,8 +77,8 @@ class GalleryScreen extends React.Component {
       progressDivider: 10,
     }
 
-    const removeFile = (uri) => {
-      console.log("FILE DELETE START: ", uri);
+    const removeFile = () => {
+      console.log("FILE DELETE START: ", localuri);
       RNFS.unlink(localuri)
       .then(() => console.log('FILE DELETED'))
       .catch((err) => {console.log('removeCachedFile failed!'); console.log(err)});
@@ -96,9 +91,7 @@ class GalleryScreen extends React.Component {
     if (statusCode == 200){
 
       try {
-        const uri = await CameraRoll.saveToCameraRoll(localuri, "photo");
-        
-        removeFile(localuri);
+        const uri = 'content://com.foodbook.provider/app_images/' + postList[index].get("photo").name();
         
         const sharePhotoContent = {
           contentType: 'photo',
@@ -126,10 +119,6 @@ class GalleryScreen extends React.Component {
             console.log(error)
             removeFile(uri)
           })
-          .catch(error => {
-            console.log(error)
-            removeFile(uri);
-          })
         } else {
           removeFile(uri);
         }
@@ -144,11 +133,77 @@ class GalleryScreen extends React.Component {
     }
   };
 
+  handleRemove = () => {
+    const { navigation } = this.props;
+    const local_postObject = this.state.postList[this.state.index];
+    console.log(local_postObject.id);
+    Parse.Cloud.run('deletePost', {postID: local_postObject.id})
+    .then(postObject => {
+      this.toggleSlide();
+      this.props.deletePostObject(local_postObject);
+      //setTimeout(() => this.setState({postList: this.props.postList}), 100);
+    })
+    .catch(error => {
+      console.log(error.message.message);
+    })
+  }
+
+  componentDidMount(){
+  }
+
+  
+  componentWillReceiveProps(nextProps){
+    console.log(nextProps);
+    console.log("Props changed!");
+    if(nextProps.postList != this.state.postList){
+      this.setState({postList: nextProps.postList});
+    }
+  }
+
+  changeMode = (mode) => {
+    this.setState({mode});
+  }
+
+  photoView = ({item, index}) => (
+    <PhotoView
+      source={{uri: item.get("photo").url()}}
+      minimumZoomScale={1}
+      maximumZoomScale={3}
+      androidScaleType="fitCenter"
+      style={{width, height}}
+    />
+  );
+
+  postView = ({item, index}) => (
+    <View style={{width, height}}>
+      <FBText style={{color:'white'}}>Hello</FBText>
+      <PhotoView
+        source={{uri: item.get("photo").url()}}
+        minimumZoomScale={1}
+        maximumZoomScale={3}
+        androidScaleType="fitCenter"
+        style={{width: 100, height:100}}
+      />
+    </View>
+  );
+
+  onViewableItemsChanged = ({viewableItems, changed}) => {
+    const {index, isViewable} = changed[0];
+    if(isViewable == true){
+      this.setState({index});
+    }
+  }
+
   render(){
     const { navigation } = this.props;
-    const { width, height } = Dimensions.get('window');
 
-    if (this.props.postList.length == 0){
+    if (!this.state.postList){
+      <View>
+        <FBText>We are loading postlist...</FBText>
+      </View>
+    }
+
+    if (this.state.postList.length == 0){
       return (
         <View style={{width: '100%', flex: 1, alignItems:'center', justifyContent:'center'}}>
           <TouchableOpacity 
@@ -163,11 +218,8 @@ class GalleryScreen extends React.Component {
 
     return(
       <View style={{width:'100%', flex: 1}}>
-        <TouchableOpacity style={{width:'100%', height: 50}} onPress={this.handleShare}>
-          <FBText>Share!</FBText>
-        </TouchableOpacity>
         <FlatList
-          data={this.props.postList}
+          data={this.state.postList}
           renderItem={({item, index}) => (
             <TouchableOpacity 
               key={index} 
@@ -188,30 +240,37 @@ class GalleryScreen extends React.Component {
           visible={this.state.slideVisible}
           onRequestClose={this.toggleSlide}
         >
-          <FlatList
-            //ref={ref => this._gallery = ref}
-            horizontal
-            data={this.props.postList}
-            renderItem={({item, index}) => 
-              <PhotoView
-                
-                source={{uri: item.get("photo").url()}}
-                minimumZoomScale={1}
-                maximumZoomScale={3}
-                androidScaleType="fitCenter"
-                resizeMode='contain'
-                style={{width, height, backgroundColor:'black'}}
-              />
-            }
-            pagingEnabled
-            windowSize={5}
-            getItemLayout={(data, index) => ({length: width, offset: width*index, index})}
-            initialScrollIndex={this.state.index}
-            initialNumToRender={0}
-            showsHorizontalScrollIndicator={false}
-            keyExtractor={(item, index) => index.toString()}
-            removeClippedSubviews={true}
-          />
+          <View style={{width:'100%', flex: 1, backgroundColor:'black'}}>
+            <View style={{width:'100%', position:'absolute'}}>
+              <FlatList
+                //ref={ref => this._gallery = ref}
+                horizontal
+                data={this.state.postList}
+                renderItem={this.state.mode == 'photo' ? this.photoView : this.postView}
+                pagingEnabled
+                windowSize={5}
+                getItemLayout={(data, index) => ({length: width, offset: width*index, index})}
+                initialScrollIndex={this.state.index}
+                initialNumToRender={0}
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item, index) => index.toString()}
+                removeClippedSubviews={true}
+                onViewableItemsChanged={this.onViewableItemsChanged}
+                viewabilityConfig={this.viewabilityConfig}
+              />    
+            </View>    
+            <View style={{width:'100%', flexDirection:'row', padding:'2%', alignItems:'center', justifyContent:'flex-end'}}>
+              <TouchableOpacity style={{marginHorizontal: '1%'}} onPress={this.handleRemove}>
+                <Ionicons name='md-trash' color='white' size={30} />
+              </TouchableOpacity>
+              <TouchableOpacity style={{marginHorizontal: '1%'}} onPress={this.handleShare}>
+                <Ionicons name='ios-share-alt' color='white' size={30} />
+              </TouchableOpacity>
+              <TouchableOpacity style={{marginHorizontal: '1%'}} onPress={() => this.changeMode(this.state.mode == 'photo' ? 'post' : 'photo')}>
+                <FontAwesome name={this.state.mode == 'photo' ? 'compress' : 'expand'} color='white' size={30} />
+              </TouchableOpacity>
+            </View>
+          </View>
         </Modal>
       </View>
     );
@@ -235,8 +294,7 @@ const mapStateToProps = (state) => {
 
 const mapDispatchToProps = (dispatch) => {
   return {
-    fetchPostList: postList => dispatch(actions.fetchPostList(postList)),
-    insertPostObject: postObject => dispatch(actions.insertPostObject(postbject)),
+    deletePostObject: postObject => dispatch(actions.deletePostObject(postObject)),
   };
 }
 
